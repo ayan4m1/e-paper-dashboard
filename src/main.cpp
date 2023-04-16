@@ -3,7 +3,7 @@
 #include <gfx_cpp14.hpp>
 #include <lilygot54in7.hpp>
 
-#include "Montserrat.h"
+#include "Montserrat.hpp"
 
 using namespace arduino;
 using namespace gfx;
@@ -14,7 +14,7 @@ void lines_demo() {
   draw::suspend(epd);
 
   draw::filled_rectangle(epd, (srect16)epd.bounds(), epd_color::white);
-  const open_font& f = Maziro_ttf;
+  const open_font& f = Montserrat;
   const char* text = "GFX";
   const float scale =
       f.scale(min(epd.dimensions().width, epd.dimensions().height) / 2);
@@ -105,12 +105,5 @@ void loop() {
   lines_demo();
   alpha_demo();
   epd.sleep(true);
-  delay(2000);
-  draw::suspend(epd);
-  srect16 sr(0, 0, 335, 255);
-  sr.center_inplace((srect16)epd.bounds());
-  image3_jpg_stream.seek(0);
-  draw::image(epd, sr, &image3_jpg_stream);
-  draw::resume(epd);
   delay(2000);
 }
