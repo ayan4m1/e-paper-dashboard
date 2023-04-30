@@ -1,109 +1,131 @@
 #include <Arduino.h>
+#include <Button2.h>
 
 #include <gfx_cpp14.hpp>
 #include <lilygot54in7.hpp>
 
-#include "Montserrat.hpp"
+#include "Bm437_HP_100LX_16x12.h"
+
+#define SERIAL_BAUD 115200
+
+#define GRAPH_INSET_PX 32
+
+#define GFX_ROTATION 1
+
+#define BTN_LEFT_PIN 35
+#define BTN_CENTER_PIN 34
+#define BTN_RIGHT_PIN 39
 
 using namespace arduino;
 using namespace gfx;
 
 lilygot54in7 epd;
 using epd_color = color<decltype(epd)::pixel_type>;
-void lines_demo() {
-  draw::suspend(epd);
 
-  draw::filled_rectangle(epd, (srect16)epd.bounds(), epd_color::white);
-  const open_font& f = Montserrat;
-  const char* text = "GFX";
-  const float scale =
-      f.scale(min(epd.dimensions().width, epd.dimensions().height) / 2);
-  srect16 text_rect =
-      srect16(spoint16(0, 0),
-              f.measure_text((ssize16)epd.dimensions(), {0, 0}, text, scale));
-  draw::text(epd, text_rect.center((srect16)epd.bounds()), {0, 0}, text, f,
-             scale, epd_color::black, epd_color::white, true, true);
+Button2 leftButton(BTN_LEFT_PIN);
+Button2 centerButton(BTN_CENTER_PIN);
+Button2 rightButton(BTN_RIGHT_PIN);
 
-  for (int i = 1; i < 100; i += 4) {
-    // calculate our extents
-    srect16 r(
-        i * (epd.dimensions().width / 100.0),
-        i * (epd.dimensions().height / 100.0),
-        epd.dimensions().width - i * (epd.dimensions().width / 100.0) - 1,
-        epd.dimensions().height - i * (epd.dimensions().height / 100.0) - 1);
+void drawGraphData() {}
 
-    draw::line(epd, srect16(0, r.y1, r.x1, epd.dimensions().height - 1),
-               epd_color::red);
-    draw::line(epd, srect16(r.x2, 0, epd.dimensions().width - 1, r.y2),
-               epd_color::yellow);
-    draw::line(epd, srect16(0, r.y2, r.x1, 0), epd_color::orange);
-    draw::line(epd,
-               srect16(epd.dimensions().width - 1, r.y1, r.x2,
-                       epd.dimensions().height - 1),
-               epd_color::green);
+void drawGraph(const rect16 bounds, const srect16 ranges,
+               const spoint16 tickIntervals) {
+  // prepare area
+  draw::filled_rectangle(epd, bounds, epd_color::white);
+  draw::rectangle(epd, bounds, epd_color::black);
+
+  // calculate pixel size for graph
+  auto graphSize = point16(min(bounds.height(), epd.dimensions().height),
+                           min(bounds.width(), epd.dimensions().width));
+  auto dataSize =
+      point16(graphSize.x - GRAPH_INSET_PX, graphSize.y - GRAPH_INSET_PX);
+
+  // draw axis lines
+  auto xLine = srect16(GRAPH_INSET_PX, GRAPH_INSET_PX, GRAPH_INSET_PX, graphSize.x);
+  draw::line(epd, xLine, epd_color::black);
+  auto yLine = srect16(GRAPH_INSET_PX, GRAPH_INSET_PX, graphSize.y, GRAPH_INSET_PX);
+  draw::line(epd, yLine, epd_color::black);
+
+  // draw x-axis ticks and labels
+  uint32_t xRange = abs(ranges.x2 - ranges.x1);
+  uint32_t xTicks = floor(max(0.0, (xRange / tickIntervals.x) - 1.0));
+  uint32_t xPixelsPerTick = dataSize.x / xTicks;
+  for (uint8_t i = 1; i <= xTicks; i++) {
+    uint32_t y = GRAPH_INSET_PX + (i * xPixelsPerTick);
+    auto tickLine = srect16(GRAPH_INSET_PX / 2, y, GRAPH_INSET_PX, y);
+
+    draw::line(epd, tickLine, epd_color::black);
+
+    // char buffer[8];
+    // sprintf(buffer, "%d", (uint32_t)round(i * tickIntervals.x));
+
+    // Serial.println(buffer);
+
+    // auto textScale = Montserrat.scale(GRAPH_INSET_PX / 2);
+    // auto textBounds = srect16(spoint16::zero(), Montserrat.measure_text(ssize16::max(), spoint16::zero(), buffer, textScale));
+    // open_text_info oti(buffer, Montserrat, textScale);
+    // draw::text(epd, textBounds.center(srect16(0, 0, GRAPH_INSET_PX / 2, graphSize.y)), oti, epd_color::black);
   }
 
-  draw::resume(epd);
+  // draw y-axis ticks and labels
+  uint32_t yRange = abs(ranges.y2 - ranges.y1);
+  uint32_t yTicks = floor(max(0.0, (yRange / tickIntervals.y) - 1.0));
+  uint32_t yPixelsPerTick = dataSize.y / yTicks;
+  for (uint8_t i = 1; i <= yTicks; i++) {
+    uint32_t x = GRAPH_INSET_PX + (i * yPixelsPerTick);
+    auto tickLine = srect16(x, GRAPH_INSET_PX / 2, x, GRAPH_INSET_PX);
 
-  delay(500);
+    draw::line(epd, tickLine, epd_color::black);
+
+    char buffer[8];
+    sprintf(buffer, "%d", (uint32_t)round(i * tickIntervals.y));
+
+    Serial.println(buffer);
+
+    // auto textScale = Bm437_HP_100LX_16x12_FON.scale(GRAPH_INSET_PX / 2);
+    // auto textBounds = srect16(spoint16::zero(), Montserrat.measure_text(ssize16::max(), spoint16::zero(), buffer, textScale));
+    text_info ti(buffer, Bm437_HP_100LX_16x12_FON, 16);
+    // draw::text(epd, textBounds.center(srect16(0, 0, GRAPH_INSET_PX / 2, graphSize.y)), oti, epd_color::black);
+    auto textBounds = srect16(spoint16::zero(), Bm437_HP_100LX_16x12_FON.measure_text(ssize16::max(), buffer, 16));
+    auto centeredBounds = textBounds.center(srect16(0, 0, GRAPH_INSET_PX / 2, graphSize.y));
+    draw::text(epd, centeredBounds, ti, epd_color::black);
+  }
+  // draw data series
 }
-void alpha_demo() {
-  draw::suspend(epd);
-  draw::filled_rectangle(epd, (srect16)epd.bounds(), epd_color::black);
 
-  for (int y = 0; y < epd.dimensions().height; y += 16) {
-    for (int x = 0; x < epd.dimensions().width; x += 16) {
-      if (0 != ((x + y) % 32)) {
-        draw::filled_rectangle(epd, srect16(spoint16(x, y), ssize16(16, 16)),
-                               epd_color::white);
-      }
-    }
-  }
-  randomSeed(millis());
-
-  rgba_pixel<32> px;
-  spoint16 tpa[3];
-  const uint16_t sw = min(epd.dimensions().width, epd.dimensions().height) / 4;
-  for (int i = 0; i < 30; ++i) {
-    px.channel<channel_name::R>((rand() % 256));
-    px.channel<channel_name::G>((rand() % 256));
-    px.channel<channel_name::B>((rand() % 256));
-    px.channel<channel_name::A>(50 + rand() % 156);
-    srect16 sr(0, 0, rand() % sw + sw, rand() % sw + sw);
-    sr.offset_inplace(rand() % (epd.dimensions().width - sr.width()),
-                      rand() % (epd.dimensions().height - sr.height()));
-    switch (rand() % 4) {
-      case 0:
-        draw::filled_rectangle(epd, sr, px);
-        break;
-      case 1:
-        draw::filled_rounded_rectangle(epd, sr, .1, px);
-        break;
-      case 2:
-        draw::filled_ellipse(epd, sr, px);
-        break;
-      case 3:
-        tpa[0] = {int16_t(((sr.x2 - sr.x1) / 2) + sr.x1), sr.y1};
-        tpa[1] = {sr.x2, sr.y2};
-        tpa[2] = {sr.x1, sr.y2};
-        spath16 path(3, tpa);
-        draw::filled_polygon(epd, path, px);
-        break;
-    }
-  }
-  draw::resume(epd);
-
-  delay(2000);
+void leftButtonClick(Button2 &btn) {
+  // todo: page up
 }
+
+void centerButtonClick(Button2 &btn) {
+  // todo: refresh?
+}
+
+void rightButtonClick(Button2 &btn) {
+  // todo: page down
+}
+
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(SERIAL_BAUD);
 
+  leftButton.setClickHandler(leftButtonClick);
+  centerButton.setClickHandler(centerButtonClick);
+  rightButton.setClickHandler(rightButtonClick);
+
+  epd.rotation(GFX_ROTATION);
+  epd.initialize();
   epd.clear(epd.bounds());
 }
 
 void loop() {
-  lines_demo();
-  alpha_demo();
+  draw::suspend(epd);
+  auto graphBounds =
+      rect16(0, 0, epd.bounds().width(), epd.bounds().height() - 96);
+  auto graphRanges = srect16(0, 0, 100, 100);
+  auto graphTicks = spoint16(5, 5);
+  drawGraph(graphBounds, graphRanges, graphTicks);
+  drawGraphData();
+  draw::resume(epd);
   epd.sleep(true);
-  delay(2000);
+  delay(30000);
 }
